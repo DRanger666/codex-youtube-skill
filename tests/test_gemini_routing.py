@@ -290,6 +290,18 @@ class GeminiRouterTests(unittest.TestCase):
             )
         self.assertEqual(transport.calls[0][1], "environment-primary")
 
+    def test_fallback_environment_credential_is_optional(self):
+        transport = FakeTransport([response(200)])
+        with mock.patch.dict(
+            os.environ,
+            {"GEMINI_API_KEY": "primary-secret"},
+            clear=True,
+        ), mock.patch.object(
+            gemini_request, "send_request", transport
+        ), mock.patch.object(gemini_request.random, "uniform", return_value=0.0):
+            self.assertEqual(gemini_request.run(self.args), 0)
+        self.assertEqual([call[1] for call in transport.calls], ["primary-secret"])
+
     def test_saved_state_and_router_result_contain_no_secret_material(self):
         _, result, _ = self.run_router([response(200)])
         serialized = json.dumps(result) + Path(self.args.state).read_text(encoding="utf-8")

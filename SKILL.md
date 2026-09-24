@@ -5,6 +5,11 @@ description: Reproducible YouTube research in Codex using MCP-first caption and 
 
 # Work with YouTube
 
+## Status
+
+Provisionally installed for Codex. The structure and local-only behavior are
+unit tested; a live YouTube/Gemini workflow still needs behavioral validation.
+
 For each video, use every relevant YouTube MCP result first, previously saved
 Gemini material second, and a new Gemini request only for the unresolved need.
 Read [references/contracts.md](references/contracts.md) completely before using
