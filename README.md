@@ -82,8 +82,9 @@ codex mcp get youtube
 This creates the pinned installation at
 `${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}/youtube` and adds
 its stdio command to
-`${CODEX_HOME:-$HOME/.codex}/config.toml`. Start a new Codex session afterward
-so the newly registered tools are available.
+`${CODEX_HOME:-$HOME/.codex}/config.toml`. Reload Codex afterward—for example,
+exit and resume the same thread—so the newly registered tools are available.
+A new conversation is not required.
 
 ## Development
 

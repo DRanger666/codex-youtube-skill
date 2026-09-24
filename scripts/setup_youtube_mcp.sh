@@ -29,4 +29,4 @@ else
 fi
 
 "$codex_cli" mcp get "$MCP_NAME"
-echo "Start a new Codex session to make the YouTube MCP tools available."
+echo "Reload Codex to make the YouTube MCP tools available; exiting and resuming the same thread is sufficient."

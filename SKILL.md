@@ -52,10 +52,11 @@ change, then run:
 sh "$skill_dir/scripts/setup_youtube_mcp.sh"
 ```
 
-Start a new Codex session after setup. Do not reinstall or reregister the MCP
-for each video request. The setup script installs and verifies the pinned
-server before registering it in Codex. Its lower-level client wrapper exists
-only for that handshake check.
+Reload Codex after setup—for example, exit and resume the same thread—so it
+reloads the MCP configuration. A new conversation is not required. Do not
+reinstall or reregister the MCP for each video request. The setup script
+installs and verifies the pinned server before registering it in Codex. Its
+lower-level client wrapper exists only for that handshake check.
 
 For local Gemini state, set:
 
