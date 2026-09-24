@@ -178,6 +178,11 @@ secret manager before starting Codex. Never ask
 the user to paste a key into chat, print either value, put a value in a command
 argument, or save credentials under the repository or portable runtime.
 
+When both keys are present, try the primary project first. Use the fallback
+sequentially only after the primary is rate-limited, rejected as an invalid
+credential, or placed in cooldown after exhausted transient retries. Do not
+fail over for a terminal request error such as an invalid request.
+
 ## Run one logged Gemini request
 
 Use `scripts/gemini_request_log.py` for the per-video request log in

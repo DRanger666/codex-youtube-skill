@@ -66,6 +66,11 @@ different. Provision them through the user's shell or local secret manager
 before starting Codex. Never place either value in chat, command arguments,
 repository files, runtime state, saved responses, or logs.
 
+Routing is primary-first and sequential. A primary rate limit, credential
+failure, or exhausted transient retry budget permits the fallback project. A
+terminal request failure does not. Cooldown and disabled state are recorded by
+project alias without storing either key.
+
 ## Gemini requests
 
 Use the Generate Content endpoint:
