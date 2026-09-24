@@ -1,6 +1,6 @@
 ---
 name: work-with-youtube
-description: Reproducible YouTube research in ChatGPT Work using MCP-first caption and metadata retrieval, saved Gemini video material, structured transcript generation, visual inspection, long-video chunking, Drive-backed request history, and private credential recovery. Use for any request to inspect, summarize, query, compare, cite, translate, transcribe, verify, or otherwise work with one or more YouTube URLs or videos, including in a fresh Work Mode VM.
+description: Reproducible YouTube research in Codex using MCP-first caption and metadata retrieval, locally saved Gemini video material, structured transcript generation, visual inspection, and long-video chunking. Use for requests to inspect, summarize, query, compare, cite, translate, transcribe, or verify one or more YouTube URLs or videos.
 ---
 
 # Work with YouTube
@@ -8,18 +8,18 @@ description: Reproducible YouTube research in ChatGPT Work using MCP-first capti
 For each video, use every relevant YouTube MCP result first, previously saved
 Gemini material second, and a new Gemini request only for the unresolved need.
 Read [references/contracts.md](references/contracts.md) completely before using
-Google Drive or Gemini.
+Gemini.
 
 ## Keep the workflow safe
 
-- Keep the portable installation at `/workspace/youtube-mcp-portable`, with
-  disposable files under `work/` and Gemini router state under `state/`.
+- Keep the portable installation under
+  `${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}`,
+  with disposable files under `work/` and persistent local data under `state/`.
 - Never display, quote, log, or commit API keys. Keep credential files out of
   prompts, saved responses, request logs, material indexes, `work/`, and
   `state/`.
-- Store saved Gemini work only in the private `YouTubeVideoWork` Drive folder
-  identified by the stable folder ID in the contract. Do not search, import,
-  migrate, or fall back to cache-v2 files.
+- Store saved Gemini work only in `$install/state/youtube-video-work/`. Keep
+  disposable request and response files in `$install/work/`.
 - Never edit a saved Gemini response. Use the material index only to find
   reusable responses; use the request log only to record Gemini requests and
   their known outcomes.
@@ -28,19 +28,21 @@ Google Drive or Gemini.
   retry an unchanged terminal request failure.
 - Preserve every routing attempt returned by the router. If the router does not
   return a terminal result, keep the run pending and invent no outcome.
-- Allow only one write-capable Work session per video. Read-only work can
+- Allow only one write-capable Codex session per video. Read-only work can
   proceed elsewhere, and different videos can be processed concurrently.
 - Run Gemini chunks sequentially.
 
 ## Prepare the local YouTube MCP
 
 Set `skill_dir` to this skill directory, then discover or restore the pinned
-portable installation:
+portable installation. The first build needs network access and may need
+approval to write outside the active workspace:
 
 ```sh
+youtube_skill_home=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}
 install=$(sh "$skill_dir/scripts/ensure_youtube_mcp.sh" \
-  --search-root /workspace \
-  --install-parent /workspace)
+  --search-root "$youtube_skill_home" \
+  --install-parent "$youtube_skill_home")
 ```
 
 Verify the server and enumerate its current tools:
@@ -69,19 +71,18 @@ queries.
 
 ## Search saved Gemini material
 
-Use `scripts/saved_gemini_responses.py` and the exact Drive filenames and JSON
-fields defined in the contract.
+Use `scripts/saved_gemini_responses.py` and the local filenames and JSON fields
+defined in the contract.
 
-1. Run `locate --video VIDEO`, then look up the exact material-index filename
-   in the stable `YouTubeVideoWork` folder.
+1. Set `material_dir="$install/state/youtube-video-work"`, create it if needed,
+   and run `locate --video VIDEO` to obtain the exact local filenames.
 2. If the index is absent, enumerate that video's saved-response filenames.
    Rebuild the index when responses exist. Initialize an empty index only after
    confirming that none exist.
 3. Build a query for the video, controlled output type and format, and requested
    half-open millisecond ranges. Run `find-material` against the local index.
-4. Download only `savedResponseIdsToFetch`, then run `verify-selected`.
-   Re-fetch and re-verify only replacements returned after stale or invalid
-   selections are removed.
+4. Run `verify-selected` against `material_dir`. Replan around stale or invalid
+   local files before generating anything new.
 5. Run `plan-missing-ranges` only after verification. Do not construct a
    Gemini request for covered time.
 
@@ -90,20 +91,20 @@ Reusable material has exactly four output types:
 - `transcript`: `gemini-transcript` version `1`, checked mechanically.
 - `summary`, `systematic_visual_description`, and
   `systematic_onscreen_text`: `gemini-free-form-text` version `1`, admitted
-  to the index only after ChatGPT review and conservative assignment of covered
+  to the index only after Codex review and conservative assignment of covered
   time within the requested source range.
 
 When rebuilding an index, supply explicit admission decisions for every
 free-form response as defined in the contract. Keep structurally invalid
 transcript responses saved but unindexed.
 
-Do not save or search translations. Translate on demand in ChatGPT from MCP
+Do not save or search translations. Translate on demand in Codex from MCP
 material or saved source-language transcripts and onscreen text. Preserve
 multilingual evidence in the source content itself.
 
 ## Use Gemini for the remaining video access
 
-Use Gemini as a video sensor and keep reasoning in ChatGPT. Prefer prompts that
+Use Gemini as a video sensor and keep reasoning in Codex. Prefer prompts that
 ask Gemini to report what is visible or audible: a board, slide, onscreen text,
 scene, action, or other specific evidence.
 
@@ -112,9 +113,9 @@ Classify the requested result before building it:
 - `video_material`: systematic source material worth reusing. Save it under
   one controlled output type.
 - `task_specific_observation`: narrow sensory evidence for the current task.
-  Return it to ChatGPT and do not save its response text to Drive.
+  Return it to Codex and do not save its response text.
 - `direct_answer`: Gemini's task-specific answer, used only when actually
-  wanted. Return it without saving its response text to Drive.
+  wanted. Return it without saving its response text.
 
 Do not turn a narrow question into reusable material merely to retain it.
 Successful one-time requests still receive a verified request-log outcome.
@@ -165,25 +166,17 @@ Never repeat the identical request as truncation handling.
 
 ## Load Gemini credentials privately
 
-Run `python3 "$skill_dir/scripts/youtube_credentials.py" check` first. If it
-succeeds, reuse the protected local credential and do not read Drive.
-
-Only when that check fails, fetch the canonical Drive file by the stable file
-ID in the contract as ordinary readable text. If the ID is unavailable,
-require one exact filename match inside the verified folder. Do not display or
-repeat the text. Pass the complete text on standard input to
-`python3 "$skill_dir/scripts/youtube_credentials.py" install`, then run
-`check` again. Never shell-source it or place credential values in a command
-argument. If Drive access is unavailable, stop and ask the user to connect it.
-
-The router reads the validated local file directly after request verification;
-do not export its assignments. It uses the primary project first and the
-fallback project only when the primary is unavailable.
+The router reads required `GEMINI_API_KEY` and optional
+`GEMINI_API_KEY_FALLBACK` from the local process environment after request
+verification. The user should provision them through their shell or local
+secret manager before starting Codex. Never ask
+the user to paste a key into chat, print either value, put a value in a command
+argument, or save credentials under the repository or portable runtime.
 
 ## Run one logged Gemini request
 
-Use `scripts/gemini_request_log.py` for the per-video request log and replace
-the corresponding Drive file after every successful local log update.
+Use `scripts/gemini_request_log.py` for the per-video request log in
+`$install/state/youtube-video-work/`.
 
 1. Run `locate --video VIDEO` and look up the exact request-log filename.
    Initialize a log only after confirming that no exact-name file exists.
@@ -193,7 +186,7 @@ the corresponding Drive file after every successful local log update.
    transcript mode; otherwise declare the content class and, for reusable
    material, its controlled output type and format. Add `--retry-reason` only
    when the user deliberately authorizes another run.
-4. Upload the pending request log before invoking the router.
+4. Persist the pending request log locally before invoking the router.
 5. Run the router with the same request log, request ID, run number, endpoint,
    model, method, and exact request file:
 
@@ -208,17 +201,16 @@ python3 "$skill_dir/scripts/gemini_request.py" \
   --state "$install/state/gemini-keypool-state.json"
 ```
 
-6. For a returned terminal failure, run `finish-run` with the router result,
-   upload the updated request log, and save no response.
-7. For successful `video_material`, run `save-response`; upload the immutable
-   response; run `finish-run` with the saved response and its Drive file ID;
-   and upload the updated request log. Add checked or reviewed material to the
-   index afterward, then upload the index. Never index malformed transcript
+6. For a returned terminal failure, run `finish-run` with the router result and
+   save no response.
+7. For successful `video_material`, run `save-response` into `material_dir`,
+   then run `finish-run` with that saved response. Add checked or reviewed
+   material to the local index afterward. Never index malformed transcript
    output, unreviewed free-form output, or free-form output whose
    `finishReason` is not `STOP`.
 8. For successful one-time content, run `finish-run` with the router result
    and exact local response file. It records that response storage was
-   deliberately omitted. Do not upload the response text.
+   deliberately omitted. Do not retain the response text.
 
 The log keeps one logical request with numbered authorized runs. Each run keeps
 its own exact request hash, authorization, returned routing attempts, cooldown,
@@ -230,7 +222,7 @@ overwritten.
 Never infer an outcome from elapsed time.
 
 1. Ask the user to confirm that the earlier write-capable session stopped.
-2. For reusable material, enumerate and download every saved response that
+2. For reusable material, enumerate every local saved response that
    could claim the pending run, then pass every candidate path to `finish-run`
    with both interruption confirmations. The command completes the run only
    when exactly one file verifies the request ID, run number, exact request

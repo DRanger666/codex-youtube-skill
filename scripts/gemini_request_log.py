@@ -40,7 +40,7 @@ RUN_OPTIONAL_FIELDS = {
     "earliestCooldownUntil",
     "interruptionReason",
     "savedResponseId",
-    "savedResponseDriveFileId",
+    "savedResponseFileName",
     "savedResponseFileSha256",
     "responseNotSavedByPolicy",
 }
@@ -430,7 +430,7 @@ def _success_fields(run):
         key
         for key in (
             "savedResponseId",
-            "savedResponseDriveFileId",
+            "savedResponseFileName",
             "savedResponseFileSha256",
             "responseNotSavedByPolicy",
         )
@@ -492,7 +492,7 @@ def validate_run(run, request, expected_number):
         if request["contentClass"] == "video_material":
             required = {
                 "savedResponseId",
-                "savedResponseDriveFileId",
+                "savedResponseFileName",
                 "savedResponseFileSha256",
             }
             if successes != required:
@@ -500,7 +500,7 @@ def validate_run(run, request, expected_number):
             common.validate_sha256(run["savedResponseId"], "saved response ID")
             common.validate_sha256(run["savedResponseFileSha256"], "saved response file hash")
             _validate_non_empty_string(
-                run["savedResponseDriveFileId"], "saved response Drive file ID"
+                run["savedResponseFileName"], "saved response filename"
             )
         elif successes != {"responseNotSavedByPolicy"} or run.get(
             "responseNotSavedByPolicy"
@@ -923,7 +923,6 @@ def finish_run(
     response_path=None,
     saved_response_path=None,
     candidate_response_paths=None,
-    saved_response_drive_file_id=None,
     confirmed_session_stopped=False,
     confirmed_response_enumeration=False,
     updated_at=None,
@@ -985,7 +984,6 @@ def finish_run(
         if (
             response_path is not None
             or saved_response_path is not None
-            or saved_response_drive_file_id is not None
         ):
             raise RequestLogError("Failed router result cannot finish with a response")
         run_status = "failed"
@@ -1008,13 +1006,10 @@ def finish_run(
                 or saved_response["exactRequestSha256"] != run["exactRequestSha256"]
             ):
                 raise RequestLogError("Saved response does not belong to this request run")
-            _validate_non_empty_string(
-                saved_response_drive_file_id, "saved response Drive file ID"
-            )
             if saved_response["responseSha256"] != result["responseSha256"]:
                 raise RequestLogError("Saved response and router response hashes differ")
         else:
-            if saved_response_path is not None or saved_response_drive_file_id is not None:
+            if saved_response_path is not None:
                 raise RequestLogError("One-time content classes cannot link saved responses")
             if response_path is None:
                 raise RequestLogError("One-time success requires the actual response file")
@@ -1029,7 +1024,7 @@ def finish_run(
         run["earliestCooldownUntil"] = result["earliestCooldownUntil"]
     if run_status == "succeeded" and request["contentClass"] == "video_material":
         run["savedResponseId"] = saved_response["savedResponseId"]
-        run["savedResponseDriveFileId"] = saved_response_drive_file_id
+        run["savedResponseFileName"] = Path(saved_response_path).resolve().name
         run["savedResponseFileSha256"] = saved_file_hash
     elif run_status == "succeeded":
         run["responseNotSavedByPolicy"] = True
@@ -1111,7 +1106,7 @@ def command_locate(args):
     print(
         json.dumps(
             {
-                "folderName": common.DRIVE_FOLDER,
+                "stateDirectoryName": common.LOCAL_STATE_DIRECTORY,
                 "videoId": video_id,
                 "requestLogFileName": request_log_filename(video_id),
             },
@@ -1203,7 +1198,6 @@ def command_finish_run(args):
         response_path=args.response,
         saved_response_path=args.saved_response,
         candidate_response_paths=args.candidate_saved_response,
-        saved_response_drive_file_id=args.saved_response_drive_file_id,
         confirmed_session_stopped=args.confirmed_session_stopped,
         confirmed_response_enumeration=args.confirmed_response_enumeration,
         updated_at=args.updated_at,
@@ -1297,7 +1291,6 @@ def build_parser():
     finish.add_argument("--response")
     finish.add_argument("--saved-response")
     finish.add_argument("--candidate-saved-response", action="append", default=[])
-    finish.add_argument("--saved-response-drive-file-id")
     finish.add_argument("--confirmed-session-stopped", action="store_true")
     finish.add_argument("--confirmed-response-enumeration", action="store_true")
     finish.add_argument("--updated-at")

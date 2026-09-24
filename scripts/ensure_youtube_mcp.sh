@@ -8,8 +8,9 @@ MCP_VERSION=1.2.0
 NODE_VERSION=v24.14.0
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-search_root=/workspace
-install_parent=${PWD}
+default_parent=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}
+search_root=$default_parent
+install_parent=$default_parent
 
 usage() {
   echo "usage: $0 [--search-root DIR] [--install-parent DIR]" >&2
@@ -166,7 +167,7 @@ printf '%s\n' \
 printf '%s\n' \
   '# YouTube MCP Portable' \
   '' \
-  'Pinned YouTube MCP installation for ChatGPT Work.' \
+  'Pinned YouTube MCP installation for Codex.' \
   '' \
   '- `app/`: source, dependencies, and build' \
   '- `runtime/`: bundled Node.js runtime' \

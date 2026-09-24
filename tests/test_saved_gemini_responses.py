@@ -205,9 +205,9 @@ class SavedResponseFixture(unittest.TestCase):
 
 
 class SavedGeminiResponseTests(SavedResponseFixture):
-    def test_uses_plain_drive_folder_and_predictable_names(self):
+    def test_uses_local_state_directory_and_predictable_names(self):
         item = self.build_response()
-        self.assertEqual(common.DRIVE_FOLDER, "YouTubeVideoWork")
+        self.assertEqual(common.LOCAL_STATE_DIRECTORY, "youtube-video-work")
         self.assertEqual(
             saved.material_index_filename(VIDEO_ID),
             f"{VIDEO_ID}--video-material-index.json",
@@ -239,13 +239,12 @@ class SavedGeminiResponseTests(SavedResponseFixture):
             1,
             router_result=item["routerResult"],
             saved_response_path=item["path"],
-            saved_response_drive_file_id="drive-response-1",
             updated_at=T2,
         )
         run = item["log"]["requests"][0]["runs"][0]
         self.assertEqual(run["runStatus"], "succeeded")
         self.assertEqual(run["savedResponseId"], item["saved"]["savedResponseId"])
-        self.assertEqual(run["savedResponseDriveFileId"], "drive-response-1")
+        self.assertEqual(run["savedResponseFileName"], item["path"].name)
         self.assertEqual(run["endedAt"], T1)
 
     def test_two_authorized_successes_keep_two_distinct_response_references(self):
@@ -256,7 +255,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
             1,
             router_result=item["routerResult"],
             saved_response_path=item["path"],
-            saved_response_drive_file_id="drive-response-1",
             updated_at=T2,
         )
         request, second_run = request_log.start_run(
@@ -305,7 +303,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
             2,
             router_result=second_result,
             saved_response_path=second_path,
-            saved_response_drive_file_id="drive-response-2",
             updated_at="2026-08-01T10:10:02Z",
         )
         runs = item["log"]["requests"][0]["runs"]
@@ -313,8 +310,8 @@ class SavedGeminiResponseTests(SavedResponseFixture):
         self.assertEqual([run["runStatus"] for run in runs], ["succeeded", "succeeded"])
         self.assertNotEqual(runs[0]["savedResponseId"], runs[1]["savedResponseId"])
         self.assertEqual(
-            [run["savedResponseDriveFileId"] for run in runs],
-            ["drive-response-1", "drive-response-2"],
+            [run["savedResponseFileName"] for run in runs],
+            [item["path"].name, second_path.name],
         )
 
     def test_interrupted_final_log_write_can_finish_without_another_gemini_call(self):
@@ -325,7 +322,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
                 item["request"]["requestId"],
                 1,
                 candidate_response_paths=[item["path"]],
-                saved_response_drive_file_id="drive-response-1",
                 confirmed_session_stopped=True,
             )
         request_log.finish_run(
@@ -333,7 +329,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
             item["request"]["requestId"],
             1,
             candidate_response_paths=[item["path"]],
-            saved_response_drive_file_id="drive-response-1",
             confirmed_session_stopped=True,
             confirmed_response_enumeration=True,
             updated_at=T2,
@@ -366,7 +361,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
                 item["request"]["requestId"],
                 1,
                 candidate_response_paths=[item["path"], conflicting_path],
-                saved_response_drive_file_id="drive-response-1",
                 confirmed_session_stopped=True,
                 confirmed_response_enumeration=True,
             )
@@ -443,7 +437,7 @@ class SavedGeminiResponseTests(SavedResponseFixture):
         self.assertNotIn("coveredTimeRanges", item["saved"])
         index = saved.new_material_index(VIDEO_ID, updated_at=T0)
         with self.assertRaisesRegex(saved.SavedResponseError, "cannot enter"):
-            saved.add_to_material_index(index, item["path"], "drive-malformed")
+            saved.add_to_material_index(index, item["path"])
         self.assertEqual(index["materials"], [])
 
     def test_transcript_checker_rejects_clip_mismatch_segment_order_and_bad_flags(self):
@@ -513,12 +507,11 @@ class SavedGeminiResponseTests(SavedResponseFixture):
         self.assertNotIn("formatCheck", item["saved"])
         self.assertNotIn("coveredTimeRanges", item["saved"])
         index = saved.new_material_index(VIDEO_ID, updated_at=T0)
-        with self.assertRaisesRegex(saved.SavedResponseError, "explicit ChatGPT review"):
-            saved.add_to_material_index(index, item["path"], "drive-summary")
+        with self.assertRaisesRegex(saved.SavedResponseError, "explicit Codex review"):
+            saved.add_to_material_index(index, item["path"])
         saved.add_to_material_index(
             index,
             item["path"],
-            "drive-summary",
             reviewed_free_form=True,
             covered_time_ranges=[{"startMs": 0, "endMs": 500_000}],
         )
@@ -531,7 +524,6 @@ class SavedGeminiResponseTests(SavedResponseFixture):
             saved.add_to_material_index(
                 index,
                 item["path"],
-                "drive-visual",
                 reviewed_free_form=True,
                 covered_time_ranges=[{"startMs": 0, "endMs": 700_000}],
             )
@@ -582,12 +574,11 @@ class SavedGeminiResponseTests(SavedResponseFixture):
 
 
 class MaterialIndexTests(SavedResponseFixture):
-    def add(self, index, item, drive_id=None, coverage=None):
+    def add(self, index, item, coverage=None):
         free_form = item["saved"]["outputFormat"]["name"] == "gemini-free-form-text"
         return saved.add_to_material_index(
             index,
             item["path"],
-            drive_id or f"drive-{item['saved']['savedResponseId'][:8]}",
             reviewed_free_form=free_form,
             covered_time_ranges=(
                 coverage
@@ -645,7 +636,6 @@ class MaterialIndexTests(SavedResponseFixture):
             saved.add_to_material_index(
                 index,
                 item["path"],
-                "drive-response",
                 updated_at=T1,
             )
         self.assertEqual(index, original)
@@ -663,13 +653,9 @@ class MaterialIndexTests(SavedResponseFixture):
     def test_rebuild_uses_self_contained_responses_and_requires_free_form_review(self):
         transcript = self.build_response()
         summary = self.build_response(output_type="summary")
-        drive_map = {
-            transcript["path"].name: "drive-transcript",
-            summary["path"].name: "drive-summary",
-        }
         with self.assertRaisesRegex(saved.SavedResponseError, "review metadata"):
             saved.rebuild_material_index(
-                VIDEO_ID, [transcript["path"], summary["path"]], drive_map
+                VIDEO_ID, [transcript["path"], summary["path"]]
             )
         admissions = {
             summary["path"].name: {
@@ -680,13 +666,12 @@ class MaterialIndexTests(SavedResponseFixture):
         rebuilt = saved.rebuild_material_index(
             VIDEO_ID,
             [transcript["path"], summary["path"]],
-            drive_map,
             admissions,
             updated_at=T2,
         )
         self.assertEqual(len(rebuilt["materials"]), 2)
         with self.assertRaisesRegex(saved.SavedResponseError, "initialize only"):
-            saved.rebuild_material_index(VIDEO_ID, [], {})
+            saved.rebuild_material_index(VIDEO_ID, [])
 
     def test_rebuild_skips_failed_transcript_and_rejected_free_form_response(self):
         malformed = self.build_response(generated={"not": "a transcript"})
@@ -694,7 +679,6 @@ class MaterialIndexTests(SavedResponseFixture):
         rebuilt = saved.rebuild_material_index(
             VIDEO_ID,
             [malformed["path"], summary["path"]],
-            {},
             {summary["path"].name: {"admitted": False}},
             updated_at=T2,
         )
@@ -969,7 +953,6 @@ class MaterialIndexTests(SavedResponseFixture):
                 materials.append(
                     {
                         "savedResponseId": saved_response_id,
-                        "driveFileId": f"drive-{case_number}-{material_number}",
                         "fileName": saved.saved_response_filename(
                             VIDEO_ID, "transcript", saved_response_id
                         ),
@@ -1007,7 +990,7 @@ class MaterialIndexTests(SavedResponseFixture):
         self.assertNotIn("gemini_cache", source)
         self.assertNotIn("YouTubeResearchCache", source)
         self.assertNotIn("YouTubeArtifactCacheV3", source)
-        self.assertEqual(common.DRIVE_FOLDER, "YouTubeVideoWork")
+        self.assertEqual(common.LOCAL_STATE_DIRECTORY, "youtube-video-work")
 
 
 class CommandSurfaceTests(unittest.TestCase):

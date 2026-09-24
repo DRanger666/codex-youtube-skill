@@ -14,7 +14,6 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import gemini_request_log
-import youtube_credentials
 import youtube_work_common as common
 
 
@@ -127,14 +126,16 @@ def load_state(path):
 
 
 def load_buckets():
-    try:
-        values = youtube_credentials.load_credentials()
-    except youtube_credentials.CredentialError as error:
-        raise SystemExit(str(error)) from error
-    return [
-        {"alias": "primary", "key": values["GEMINI_API_KEY"]},
-        {"alias": "fallback", "key": values["GEMINI_API_KEY_FALLBACK"]},
-    ]
+    primary = os.environ.get("GEMINI_API_KEY")
+    fallback = os.environ.get("GEMINI_API_KEY_FALLBACK")
+    if not primary:
+        raise SystemExit("Missing required environment variable: GEMINI_API_KEY")
+    if fallback and primary == fallback:
+        raise SystemExit("Primary and fallback Gemini credentials must differ")
+    buckets = [{"alias": "primary", "key": primary}]
+    if fallback:
+        buckets.append({"alias": "fallback", "key": fallback})
+    return buckets
 
 
 def error_parts(payload):

@@ -32,7 +32,6 @@ SAVED_RESPONSE_OPTIONAL_FIELDS = {
 INDEX_FIELDS = {"fileFormatVersion", "videoId", "materials", "updatedAt"}
 MATERIAL_REQUIRED_FIELDS = {
     "savedResponseId",
-    "driveFileId",
     "fileName",
     "fileSha256",
     "outputType",
@@ -437,7 +436,7 @@ def validate_material_entry(entry, video_id):
     )
     common.validate_sha256(entry["savedResponseId"], "material saved response ID")
     common.validate_sha256(entry["fileSha256"], "material file hash")
-    for field in ("driveFileId", "fileName"):
+    for field in ("fileName",):
         if not isinstance(entry[field], str) or not entry[field]:
             raise SavedResponseError(f"Material {field} must be non-empty")
     common.validate_output_format(entry["outputType"], entry["outputFormat"])
@@ -483,7 +482,6 @@ def validate_material_index(index):
 def _material_entry(
     saved_response,
     saved_response_path,
-    drive_file_id,
     reviewed_free_form=False,
     covered_time_ranges=None,
     material_description=None,
@@ -497,8 +495,6 @@ def _material_entry(
     )
     if path.name != expected_name:
         raise SavedResponseError("Saved response filename does not match its identity")
-    if not isinstance(drive_file_id, str) or not drive_file_id:
-        raise SavedResponseError("Saved response Drive file ID must be non-empty")
     if saved_response["outputFormat"]["name"] == "gemini-transcript":
         if saved_response["formatCheck"]["status"] != "passed":
             raise SavedResponseError("Failed transcript format check cannot enter the index")
@@ -507,7 +503,7 @@ def _material_entry(
             raise SavedResponseError("Transcript covered time cannot be supplied by a caller")
     else:
         if reviewed_free_form is not True:
-            raise SavedResponseError("Free-form material requires explicit ChatGPT review")
+            raise SavedResponseError("Free-form material requires explicit Codex review")
         if covered_time_ranges is None:
             raise SavedResponseError("Free-form material requires conservative covered time")
         coverage = common.normalize_intervals(
@@ -519,7 +515,6 @@ def _material_entry(
         raise SavedResponseError("Indexed material must cover a non-empty time range")
     entry = {
         "savedResponseId": saved_response["savedResponseId"],
-        "driveFileId": drive_file_id,
         "fileName": expected_name,
         "fileSha256": common.sha256_hex(path.read_bytes()),
         "outputType": saved_response["outputType"],
@@ -537,7 +532,6 @@ def _material_entry(
 def add_to_material_index(
     index,
     saved_response_path,
-    drive_file_id,
     reviewed_free_form=False,
     covered_time_ranges=None,
     material_description=None,
@@ -553,7 +547,6 @@ def add_to_material_index(
     entry = _material_entry(
         saved_response,
         path,
-        drive_file_id,
         reviewed_free_form,
         covered_time_ranges,
         material_description,
@@ -589,7 +582,6 @@ def add_to_material_index(
 def rebuild_material_index(
     video_source,
     saved_response_paths,
-    drive_file_ids,
     free_form_admissions=None,
     updated_at=None,
 ):
@@ -638,13 +630,9 @@ def rebuild_material_index(
                 "covered_time_ranges": admission["coveredTimeRanges"],
                 "material_description": admission.get("materialDescription"),
             }
-        drive_file_id = drive_file_ids.get(path.name)
-        if not drive_file_id:
-            raise SavedResponseError(f"Missing Drive file ID for {path.name}")
         add_to_material_index(
             index,
             path,
-            drive_file_id,
             updated_at=updated_at,
             **kwargs,
         )
@@ -667,7 +655,6 @@ def verify_saved_response_for_entry(entry, response_directory, video_id):
     expected = _material_entry(
         saved_response,
         path,
-        entry["driveFileId"],
         reviewed_free_form=True,
         covered_time_ranges=(
             entry["coveredTimeRanges"]
@@ -706,7 +693,6 @@ def _entry_summary(entry):
         key: entry[key]
         for key in (
             "savedResponseId",
-            "driveFileId",
             "fileName",
             "fileSha256",
             "coveredTimeRanges",
@@ -860,8 +846,8 @@ def find_material(index, query, excluded_saved_response_ids=None):
         "selectedMaterials": [_entry_summary(entry) for entry in selected],
         "incompatibleMaterials": incompatible,
         "staleIndexEntries": [],
-        "savedResponseIdsToFetch": [entry["savedResponseId"] for entry in selected],
-        "verificationStatus": "fetch_required" if selected else "not_required",
+        "savedResponseIdsToVerify": [entry["savedResponseId"] for entry in selected],
+        "verificationStatus": "verification_required" if selected else "not_required",
     }
 
 
@@ -879,13 +865,17 @@ def _validate_search_plan(plan):
         "selectedMaterials",
         "incompatibleMaterials",
         "staleIndexEntries",
-        "savedResponseIdsToFetch",
+        "savedResponseIdsToVerify",
         "verificationStatus",
     }
     common.require_exact_fields(plan, required, set(), "material search plan")
     if plan["fileFormatVersion"] != common.FILE_FORMAT_VERSION:
         raise SavedResponseError("Unsupported material search-plan format version")
-    if plan["verificationStatus"] not in {"fetch_required", "verified", "not_required"}:
+    if plan["verificationStatus"] not in {
+        "verification_required",
+        "verified",
+        "not_required",
+    }:
         raise SavedResponseError("Unsupported material verification status")
     return plan
 
@@ -919,8 +909,8 @@ def verify_selected(index, response_directory, query, plan):
         ]
         return current
     planned_ids = {item["savedResponseId"] for item in plan["selectedMaterials"]}
-    if planned_ids != set(plan["savedResponseIdsToFetch"]):
-        raise SavedResponseError("Fetch IDs do not match selected material")
+    if planned_ids != set(plan["savedResponseIdsToVerify"]):
+        raise SavedResponseError("Verification IDs do not match selected material")
     by_id = {item["savedResponseId"]: item for item in index["materials"]}
     stale = []
     for saved_response_id in sorted(planned_ids):
@@ -929,7 +919,6 @@ def verify_selected(index, response_directory, query, plan):
             stale.append(
                 {
                     "savedResponseId": saved_response_id,
-                    "driveFileId": None,
                     "fileName": None,
                     "reason": "missing_index_entry",
                 }
@@ -941,14 +930,13 @@ def verify_selected(index, response_directory, query, plan):
             stale.append(
                 {
                     "savedResponseId": entry["savedResponseId"],
-                    "driveFileId": entry["driveFileId"],
                     "fileName": entry["fileName"],
                     "reason": str(error),
                 }
             )
     if not stale:
         verified = dict(plan)
-        verified["savedResponseIdsToFetch"] = []
+        verified["savedResponseIdsToVerify"] = []
         verified["verificationStatus"] = "verified" if planned_ids else "not_required"
         return verified
     for item in stale:
@@ -964,7 +952,10 @@ def verify_selected(index, response_directory, query, plan):
 
 def plan_missing_ranges(plan):
     plan = _validate_search_plan(copy.deepcopy(plan))
-    if plan["savedResponseIdsToFetch"] or plan["verificationStatus"] == "fetch_required":
+    if (
+        plan["savedResponseIdsToVerify"]
+        or plan["verificationStatus"] == "verification_required"
+    ):
         raise SavedResponseError("Selected responses must be verified before planning new work")
     return {
         "fileFormatVersion": common.FILE_FORMAT_VERSION,
@@ -1050,7 +1041,7 @@ def command_locate(args):
     print(
         json.dumps(
             {
-                "folderName": common.DRIVE_FOLDER,
+                "stateDirectoryName": common.LOCAL_STATE_DIRECTORY,
                 "videoId": video_id,
                 "materialIndexFileName": material_index_filename(video_id),
                 "savedResponseNamePattern": f"{video_id}--gemini-response--<outputType>--<savedResponseId>.json",
@@ -1110,7 +1101,6 @@ def command_add_to_index(args):
     entry = add_to_material_index(
         index,
         args.saved_response,
-        args.drive_file_id,
         reviewed_free_form=args.reviewed_free_form,
         covered_time_ranges=coverage,
         material_description=args.material_description,
@@ -1124,7 +1114,6 @@ def command_add_to_index(args):
 def command_rebuild_index(args):
     directory = Path(args.responses_dir).resolve()
     video_id = common.normalize_youtube_video_id(args.video)
-    drive_map = common.load_json(Path(args.drive_map))
     admissions = (
         common.load_json(Path(args.free_form_admissions))
         if args.free_form_admissions
@@ -1132,7 +1121,7 @@ def command_rebuild_index(args):
     )
     paths = directory.glob(f"{video_id}--gemini-response--*--*.json")
     index = rebuild_material_index(
-        video_id, paths, drive_map, admissions, updated_at=args.updated_at
+        video_id, paths, admissions, updated_at=args.updated_at
     )
     common.write_json(Path(args.output), index)
     print(Path(args.output).resolve())
@@ -1204,7 +1193,6 @@ def build_parser():
     add = subparsers.add_parser("add-to-material-index")
     add.add_argument("--material-index", required=True)
     add.add_argument("--saved-response", required=True)
-    add.add_argument("--drive-file-id", required=True)
     add.add_argument("--reviewed-free-form", action="store_true")
     add.add_argument("--covered-time-ranges")
     add.add_argument("--material-description")
@@ -1215,7 +1203,6 @@ def build_parser():
     rebuild = subparsers.add_parser("rebuild-material-index")
     rebuild.add_argument("--video", required=True)
     rebuild.add_argument("--responses-dir", required=True)
-    rebuild.add_argument("--drive-map", required=True)
     rebuild.add_argument("--free-form-admissions")
     rebuild.add_argument("--updated-at")
     rebuild.add_argument("--output", required=True)

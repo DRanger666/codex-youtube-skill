@@ -1,13 +1,10 @@
 interface:
-  display_name: Work with YouTube
-  short_description: Analyze YouTube videos reproducibly
-  default_prompt: Use $work-with-youtube to analyze this YouTube video with all
+  display_name: "Work with YouTube"
+  short_description: "Analyze YouTube videos reproducibly"
+  default_prompt: "Use $work-with-youtube to analyze this YouTube video with all
     relevant MCP material first, saved Gemini material second, and a new Gemini
-    request only for what remains missing.
+    request only for what remains missing."
 policy:
   products:
-  - chatgpt
-  - codex
-  - api
-  - atlas
+  - "codex"
   allow_implicit_invocation: true

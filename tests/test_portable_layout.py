@@ -203,6 +203,7 @@ class PortableLayoutTests(unittest.TestCase):
             {"app", "runtime", "state", "work", "README.md", "VERSION"},
         )
         self.assertFalse((install_parent / INSTALL_NAME / "npm-cache").exists())
+        inherited_cache.chmod(0o600)
         self.assertEqual(
             inherited_cache.read_text(encoding="utf-8"),
             "not a directory\n",

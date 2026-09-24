@@ -8,7 +8,7 @@ workflow.
 ## Contents
 
 - [Local installation](#local-installation)
-- [Google Drive](#google-drive)
+- [Local state and credentials](#local-state-and-credentials)
 - [Gemini requests](#gemini-requests)
 - [Long-video clipping](#long-video-clipping)
 - [Reusable output formats](#reusable-output-formats)
@@ -20,10 +20,11 @@ workflow.
 
 ## Local installation
 
-Use this exact no-space layout:
+Use this exact no-space layout under
+`${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}`:
 
 ```text
-/workspace/youtube-mcp-portable/
+youtube-mcp-portable/
   app/
   runtime/
   state/
@@ -47,35 +48,11 @@ Pinned implementation:
 - Node: `v24.14.0`
 - Platform: `linux-x86_64`
 
-## Google Drive
+## Local state and credentials
 
-Use private Drive files. Do not create public links.
-
-Credential location:
-
-- Folder: `WorkModeCredentials`
-- Folder ID: `1q58TvI519TDgTePQG1h2Rof5EdA2jDJk`
-- File: `youtube-workbench-secrets.env`
-- File ID: `1rvfVswFWzIoqMOKsJttZgTsRkpbiKxNx`
-
-Protected local location:
-
-- Directory: `/workspace/.chatgpt-work-credentials/youtube` with mode `0700`
-- File:
-  `/workspace/.chatgpt-work-credentials/youtube/youtube-workbench-secrets.env`
-  with mode `0600`
-- Helper: `scripts/youtube_credentials.py`
-- Operations: `check` and `install`; `install` accepts the complete Drive text
-  only on standard input
-
-The normalized file contains exactly one non-empty `GEMINI_API_KEY` assignment
-and one non-empty `GEMINI_API_KEY_FALLBACK` assignment in that order. Their
-values must differ because the fallback belongs to a distinct project. The
-router reads this file directly; do not shell-source or export it.
-
-Saved Gemini work uses one private folder named `YouTubeVideoWork` with Drive
-folder ID `16hbk_mI940j-eCHBP6maBZeLMHXiY41K`. Fetch it by that stable ID and
-verify its name before use. Its three filename forms are:
+Keep persistent video material in
+`youtube-mcp-portable/state/youtube-video-work/` below that local root. Its
+three filename forms are:
 
 ```text
 <videoId>--video-material-index.json
@@ -83,13 +60,11 @@ verify its name before use. Its three filename forms are:
 <videoId>--gemini-requests.json
 ```
 
-The implementation is clean-slate. It does not search, validate, import,
-migrate, or fall back to cache-v2 files. Existing cache-v2 data remains
-untouched during implementation and initial validation; any later cleanup is
-a separate deliberate operation.
-
-Never store credentials, authorization headers, credential fragments,
-credential fingerprints, or unrelated personal information in these files.
+The local process environment supplies required `GEMINI_API_KEY` and optional
+`GEMINI_API_KEY_FALLBACK`. When both are set, they must be non-empty and
+different. Provision them through the user's shell or local secret manager
+before starting Codex. Never place either value in chat, command arguments,
+repository files, runtime state, saved responses, or logs.
 
 ## Gemini requests
 
@@ -198,23 +173,23 @@ deliberately asymmetric:
 | `outputType` | `outputFormat` | Validation |
 | --- | --- | --- |
 | `transcript` | `gemini-transcript` version `1` | Deterministic structured check |
-| `summary` | `gemini-free-form-text` version `1` | ChatGPT review before indexing |
-| `systematic_visual_description` | `gemini-free-form-text` version `1` | ChatGPT review before indexing |
-| `systematic_onscreen_text` | `gemini-free-form-text` version `1` | ChatGPT review before indexing |
+| `summary` | `gemini-free-form-text` version `1` | Codex review before indexing |
+| `systematic_visual_description` | `gemini-free-form-text` version `1` | Codex review before indexing |
+| `systematic_onscreen_text` | `gemini-free-form-text` version `1` | Codex review before indexing |
 
 Reject any other type, format, or type-format pairing. Transcript uses the
 original spoken language and native script. Systematic onscreen text preserves
 the text and script visible in the video. All `startMs` and `endMs` values are
 millisecond offsets from the beginning of the YouTube video. The `MM:SS.mmm`
 fields defined by `gemini-transcript` version `1` represent the same video-start
-offsets. Translate on demand in ChatGPT from saved source-language transcripts
+offsets. Translate on demand in Codex from saved source-language transcripts
 or source onscreen text; do not save or search translation as a reusable Gemini
 output. Do not store a top-level language field or divide material into
 language variants.
 
 `task_specific_observation` and `direct_answer` are one-time content classes.
-Their response text is returned to the current conversation and is not written
-to Drive. Their successful run is still verified and recorded.
+Their response text is returned to the current conversation and is not retained
+in local persistent state. Their successful run is still verified and recorded.
 
 ## Saved Gemini responses
 
@@ -257,26 +232,26 @@ The material index is a small search file with only:
 - `fileFormatVersion`, normalized `videoId`, `updatedAt`;
 - a sorted `materials` list.
 
-Each material entry contains its `savedResponseId`, Drive file ID, predictable
-filename, exact stored-file SHA-256, output type and format, and covered time
+Each material entry contains its `savedResponseId`, predictable filename,
+exact stored-file SHA-256, output type and format, and covered time
 ranges. A concise reviewed material description can also appear. Request IDs,
 run numbers, prompts, router attempts, retry reasons, cooldowns, and request
 status do not belong here.
 
-Search the readable index fields before downloading response files. Match
+Search the readable index fields before reading response files. Match
 output type, format, and half-open millisecond coverage. The planner supports
 exact, containing, combined, overlapping, partial, incompatible, and missing
 coverage. It returns only selected saved response IDs and remaining ranges.
-Download and verify only selected files; replan around missing, stale, or
+Verify only selected local files; replan around missing, stale, or
 invalid selections before constructing a request.
 
 Every distinct saved response ID is retained even when its type and interval
 match another entry. Transcript coverage comes only from the checker.
-Free-form material requires explicit ChatGPT review and conservative coverage
+Free-form material requires explicit Codex review and conservative coverage
 within its source range.
 
 If the index is missing, enumerate the video's saved-response files. Rebuild
-it from validated files and their Drive IDs, including explicit free-form
+it from validated local files, including explicit free-form
 review decisions. The rebuild-admissions JSON uses `admitted: true` plus
 covered time for accepted free-form material and only `admitted: false` for a
 reviewed response that remains unindexed. Failed structured responses remain
@@ -300,7 +275,7 @@ Every run contains:
   `interrupted`;
 - its own complete ordered routing attempts and applicable cooldown;
 - for runs above 1, the authorization reason and its authorization/use times;
-- on reusable success, saved-response ID, Drive file ID, and file hash;
+- on reusable success, saved-response ID, filename, and file hash;
 - on one-time success, the generated `responseNotSavedByPolicy: true` marker.
 
 Previous terminal runs are never removed or overwritten. At most one run for a
@@ -314,7 +289,7 @@ attempts; only the missing suffix is copied. Conflicts, gaps, duplicates,
 reordering, or a non-final terminal attempt stop the update. Completion time
 comes from the terminal router result, not from a later file update.
 
-For reusable success, save and upload the response before finishing the run;
+For reusable success, save the response locally before finishing the run;
 then add eligible content to the material index. For one-time success,
 `finish-run` verifies the actual response-file hash before generating the
 non-storage marker. Caller-supplied status, attempts, time, or marker are not
@@ -323,7 +298,7 @@ success evidence.
 ## Interruption decisions
 
 Do not intentionally use two write-capable sessions for the same normalized
-video ID. This is an operating rule, not a Drive lock or an exactly-once
+video ID. This is an operating rule, not a filesystem lock or an exactly-once
 guarantee.
 
 If a run remains pending after the active workflow loses the terminal router
@@ -331,7 +306,7 @@ result, its network outcome is unknown. Do not invent attempts, infer an
 outcome, or automatically retry. Ask the user to confirm that the earlier
 session has stopped.
 
-If reusable response saving reached Drive but the final request-log update did
+If reusable response saving completed but the final request-log update did
 not, enumerate all saved responses for that video. Exactly one response with
 the pending request ID, run number, and exact request hash can finish the
 existing run after byte, identity, and router-result validation. Restore its

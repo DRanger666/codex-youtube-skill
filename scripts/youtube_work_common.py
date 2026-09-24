@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 
 FILE_FORMAT_VERSION = 1
-DRIVE_FOLDER = "YouTubeVideoWork"
+LOCAL_STATE_DIRECTORY = "youtube-video-work"
 VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 OFFSET_PATTERN = re.compile(r"^([0-9]+(?:\.[0-9]{1,3})?)s$")
