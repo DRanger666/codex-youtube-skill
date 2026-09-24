@@ -50,6 +50,7 @@ verify_install() {
       *) return 1 ;;
     esac
   done
+  rg -q "^installation_name=$INSTALL_NAME$" "$candidate/VERSION" || return 1
   rg -q "^youtube_mcp_version=$MCP_VERSION$" "$candidate/VERSION" || return 1
   rg -q "^youtube_mcp_commit=$MCP_COMMIT$" "$candidate/VERSION" || return 1
   rg -q "^node_version=$NODE_VERSION$" "$candidate/VERSION" || return 1
