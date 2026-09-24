@@ -152,8 +152,8 @@ echo "Installing locked dependencies and compiling..." >&2
 (
   cd "$portable/app"
   export NPM_CONFIG_CACHE=$npm_cache
-  PATH="$portable/runtime/bin:$PATH" npm ci --no-audit --no-fund
-  PATH="$portable/runtime/bin:$PATH" npm run build
+  PATH="$portable/runtime/bin:$PATH" npm ci --no-audit --no-fund >&2
+  PATH="$portable/runtime/bin:$PATH" npm run build >&2
 )
 
 printf '%s\n' \

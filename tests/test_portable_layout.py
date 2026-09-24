@@ -206,6 +206,7 @@ class PortableLayoutTests(unittest.TestCase):
             "  [ \"$first_cache\" = \"$NPM_CONFIG_CACHE\" ] || exit 94\n"
             "fi\n"
             "printf '%s\\n' \"$NPM_CONFIG_CACHE\" >>\"$FAKE_NPM_CALLS\"\n"
+            "echo 'simulated npm progress on stdout'\n"
             "case \"$*\" in\n"
             "  'ci --no-audit --no-fund') ;;\n"
             "  'run build') mkdir -p dist; : >dist/stdio-server.js ;;\n"
@@ -240,6 +241,7 @@ class PortableLayoutTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(install_parent / INSTALL_NAME))
         cache_paths = calls.read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(cache_paths), 2)
         self.assertEqual(cache_paths[0], cache_paths[1])
