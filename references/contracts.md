@@ -22,10 +22,10 @@ workflow.
 ## Local installation
 
 Use this exact no-space layout under
-`${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}`:
+`${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}`:
 
 ```text
-youtube-mcp-portable/
+youtube/
   app/
   runtime/
   state/
@@ -66,7 +66,7 @@ check performed by `scripts/ensure_youtube_mcp.sh`.
 ## Local state and credentials
 
 Keep persistent video material in
-`youtube-mcp-portable/state/youtube-video-work/` below that local root. Its
+`youtube/state/youtube-video-work/` below that local root. Its
 three filename forms are:
 
 ```text

@@ -15,9 +15,9 @@ The skill uses the least expensive sufficient source first:
 
 MCP results are temporary. Reusable Gemini responses, material indexes,
 request logs, and router state are kept locally under the portable runtime's
-`state/` directory. By default the runtime lives under
-`${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube`; set
-`YOUTUBE_SKILL_HOME` to override it. The skill has no Google Drive dependency.
+`state/` directory. By default the runtime lives at
+`${CODEX_HOME:-$HOME/.codex}/mcp-servers/youtube`; set `YOUTUBE_SKILL_HOME` to
+override its parent directory. The skill has no Google Drive dependency.
 
 ## Local credentials
 
@@ -78,9 +78,9 @@ sh /path/to/work-with-youtube/scripts/setup_youtube_mcp.sh
 codex mcp get youtube
 ```
 
-This creates the pinned installation under
-`${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}` and
-adds its stdio command to
+This creates the pinned installation at
+`${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}/youtube` and adds
+its stdio command to
 `${CODEX_HOME:-$HOME/.codex}/config.toml`. Start a new Codex session afterward
 so the newly registered tools are available.
 

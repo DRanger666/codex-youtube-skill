@@ -18,7 +18,7 @@ Gemini.
 ## Keep the workflow safe
 
 - Keep the portable installation under
-  `${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}`,
+  `${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}/youtube`,
   with disposable files under `work/` and persistent local data under `state/`.
 - Never display, quote, log, or commit API keys. Keep credential files out of
   prompts, saved responses, request logs, material indexes, `work/`, and
@@ -59,7 +59,7 @@ only for that handshake check.
 For local Gemini state, set:
 
 ```sh
-install=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}/youtube-mcp-portable
+install=${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}/youtube
 ```
 
 Paginate broad MCP transcript reads with `offset` and `maxSegments`; prefer

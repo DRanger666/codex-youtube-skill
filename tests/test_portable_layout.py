@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "scripts" / "ensure_youtube_mcp.sh"
 SETUP = ROOT / "scripts" / "setup_youtube_mcp.sh"
-INSTALL_NAME = "youtube-mcp-portable"
+INSTALL_NAME = "youtube"
 MCP_COMMIT = "06d5e7a83783f7a44498da88ade2ccaa42238747"
 
 
@@ -24,8 +24,8 @@ class PortableLayoutTests(unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         path.chmod(0o755)
 
-    def make_install(self):
-        install = self.root / INSTALL_NAME
+    def make_install(self, parent=None):
+        install = (parent or self.root) / INSTALL_NAME
         for relative in (
             "app/dist",
             "runtime/bin",
@@ -38,7 +38,7 @@ class PortableLayoutTests(unittest.TestCase):
         (install / "VERSION").write_text(
             "\n".join(
                 (
-                    "installation_name=youtube-mcp-portable",
+                    "installation_name=youtube",
                     "youtube_mcp_version=1.2.0",
                     f"youtube_mcp_commit={MCP_COMMIT}",
                     "node_version=v24.14.0",
@@ -135,6 +135,25 @@ class PortableLayoutTests(unittest.TestCase):
             {path.name for path in install.iterdir()},
             {"app", "runtime", "state", "work", "README.md", "VERSION"},
         )
+
+    def test_default_install_lives_under_codex_home_mcp_servers(self):
+        codex_home = self.root / "codex-home"
+        install_parent = codex_home / "mcp-servers"
+        install = self.make_install(install_parent)
+        environment = os.environ.copy()
+        environment.pop("YOUTUBE_SKILL_HOME", None)
+        environment["CODEX_HOME"] = str(codex_home)
+
+        result = subprocess.run(
+            ["sh", str(INSTALLER)],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(install))
 
     def test_missing_state_requires_explicit_replacement(self):
         install = self.make_install()

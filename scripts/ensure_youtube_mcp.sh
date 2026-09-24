@@ -1,14 +1,14 @@
 #!/bin/sh
 set -eu
 
-INSTALL_NAME=youtube-mcp-portable
+INSTALL_NAME=youtube
 MCP_REPOSITORY=https://github.com/coyaSONG/youtube-mcp-server.git
 MCP_COMMIT=06d5e7a83783f7a44498da88ade2ccaa42238747
 MCP_VERSION=1.2.0
 NODE_VERSION=v24.14.0
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-default_parent=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}
+default_parent=${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}
 search_root=$default_parent
 install_parent=$default_parent
 
