@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "scripts" / "ensure_youtube_mcp.sh"
+SETUP = ROOT / "scripts" / "setup_youtube_mcp.sh"
 INSTALL_NAME = "youtube-mcp-portable"
 MCP_COMMIT = "06d5e7a83783f7a44498da88ade2ccaa42238747"
 
@@ -74,6 +75,55 @@ class PortableLayoutTests(unittest.TestCase):
             capture_output=True,
             text=True,
             env=os.environ.copy(),
+        )
+
+    def make_fake_codex(self, install, *, mismatched=False):
+        fake_bin = self.root / "codex-bin"
+        fake_bin.mkdir(exist_ok=True)
+        calls = self.root / "codex-calls.txt"
+        state = self.root / "codex-registration"
+        if mismatched:
+            state.write_text("mismatched\n", encoding="utf-8")
+        self.write_executable(
+            fake_bin / "codex",
+            "#!/bin/sh\n"
+            "set -eu\n"
+            "printf '%s\\n' \"$*\" >>\"$FAKE_CODEX_CALLS\"\n"
+            "case \"$1 $2\" in\n"
+            "  'mcp get')\n"
+            "    [ -f \"$FAKE_CODEX_STATE\" ] || exit 1\n"
+            "    if [ \"$(cat \"$FAKE_CODEX_STATE\")\" = mismatched ]; then\n"
+            "      echo '  command: /different/node'\n"
+            "      echo '  args: /different/server.js'\n"
+            "    else\n"
+            "      echo \"  command: $EXPECTED_NODE\"\n"
+            "      echo \"  args: $EXPECTED_SERVER\"\n"
+            "    fi\n"
+            "    ;;\n"
+            "  'mcp add') printf '%s\\n' registered >\"$FAKE_CODEX_STATE\" ;;\n"
+            "  *) exit 2 ;;\n"
+            "esac\n",
+        )
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "CODEX_MCP_CLI": str(fake_bin / "codex"),
+                "YOUTUBE_SKILL_HOME": str(self.root),
+                "FAKE_CODEX_CALLS": str(calls),
+                "FAKE_CODEX_STATE": str(state),
+                "EXPECTED_NODE": str(install / "runtime/bin/node"),
+                "EXPECTED_SERVER": str(install / "app/dist/stdio-server.js"),
+            }
+        )
+        return environment, calls
+
+    def run_setup(self, environment):
+        return subprocess.run(
+            ["sh", str(SETUP)],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
         )
 
     def test_recognizes_only_the_exact_maintained_layout(self):
@@ -208,6 +258,30 @@ class PortableLayoutTests(unittest.TestCase):
             inherited_cache.read_text(encoding="utf-8"),
             "not a directory\n",
         )
+
+    def test_setup_registers_once_and_is_idempotent(self):
+        install = self.make_install()
+        environment, calls = self.make_fake_codex(install)
+
+        first = self.run_setup(environment)
+        second = self.run_setup(environment)
+
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertIn("already registered", second.stdout)
+        recorded = calls.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(sum(line.startswith("mcp add youtube") for line in recorded), 1)
+
+    def test_setup_refuses_to_replace_a_different_registration(self):
+        install = self.make_install()
+        environment, calls = self.make_fake_codex(install, mismatched=True)
+
+        result = self.run_setup(environment)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("different MCP registration", result.stderr)
+        recorded = calls.read_text(encoding="utf-8").splitlines()
+        self.assertFalse(any(line.startswith("mcp add youtube") for line in recorded))
 
 
 if __name__ == "__main__":

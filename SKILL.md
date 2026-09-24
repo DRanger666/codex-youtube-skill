@@ -37,30 +37,33 @@ Gemini.
   proceed elsewhere, and different videos can be processed concurrently.
 - Run Gemini chunks sequentially.
 
-## Prepare the local YouTube MCP
+## Use the registered YouTube MCP
 
-Set `skill_dir` to this skill directory, then discover or restore the pinned
-portable installation. The first build needs network access and may need
-approval to write outside the active workspace:
+The `youtube` MCP is a persistent user-level Codex registration. Use its native
+tools directly; do not run the local MCP client wrapper during normal work.
+Codex starts the stdio server when needed, so no daemon needs to remain running.
 
-```sh
-youtube_skill_home=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}
-install=$(sh "$skill_dir/scripts/ensure_youtube_mcp.sh" \
-  --search-root "$youtube_skill_home" \
-  --install-parent "$youtube_skill_home")
-```
-
-Verify the server and enumerate its current tools:
+Machine setup is a one-time operation. If the `youtube` MCP tools are absent,
+obtain permission for the local install and user-level Codex configuration
+change, then run:
 
 ```sh
-"$install/runtime/bin/node" "$skill_dir/scripts/call_youtube_mcp.mjs" \
-  --install "$install" --list-tools
+sh "$skill_dir/scripts/setup_youtube_mcp.sh"
 ```
 
-Put complex MCP arguments in a JSON file under `$install/work/`. For
-`research-video` and `research-videos`, use `--structured-only`. Paginate
-broad transcript reads with `offset` and `maxSegments`; prefer focused
-queries.
+Start a new Codex session after setup. Do not reinstall or reregister the MCP
+for each video request. The setup script installs and verifies the pinned
+server before registering it in Codex. Its lower-level client wrapper exists
+only for that handshake check.
+
+For local Gemini state, set:
+
+```sh
+install=${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}/youtube-mcp-portable
+```
+
+Paginate broad MCP transcript reads with `offset` and `maxSegments`; prefer
+focused queries.
 
 ## Resolve the task in source order
 

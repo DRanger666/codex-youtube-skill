@@ -8,6 +8,7 @@ workflow.
 ## Contents
 
 - [Local installation](#local-installation)
+- [Codex MCP registration](#codex-mcp-registration)
 - [Local state and credentials](#local-state-and-credentials)
 - [Gemini requests](#gemini-requests)
 - [Long-video clipping](#long-video-clipping)
@@ -36,9 +37,7 @@ youtube-mcp-portable/
 Use `work/` for disposable argument files, requests, responses, downloaded
 working copies, and intermediate JSON. Reserve
 `state/gemini-keypool-state.json` for router state created when Gemini is first
-used. The displayed tree is the complete maintained root layout. Invoke the MCP
-through `scripts/call_youtube_mcp.mjs` and the pinned `runtime/bin/node`
-executable.
+used. The displayed tree is the complete maintained root layout.
 
 Pinned implementation:
 
@@ -47,6 +46,22 @@ Pinned implementation:
 - Commit: `06d5e7a83783f7a44498da88ade2ccaa42238747`
 - Node: `v24.14.0`
 - Platform: `linux-x86_64`
+
+## Codex MCP registration
+
+Run `scripts/setup_youtube_mcp.sh` once per machine. It installs and verifies
+the pinned server, then creates this persistent user-level Codex registration:
+
+- Name: `youtube`
+- Transport: `stdio`
+- Command: `<install>/runtime/bin/node`
+- Argument: `<install>/app/dist/stdio-server.js`
+- Configuration: `${CODEX_HOME:-$HOME/.codex}/config.toml`
+
+Codex starts the registered stdio process on demand. Normal skill use calls the
+native `youtube` MCP tools directly and does not reinstall the server. The
+`scripts/call_youtube_mcp.mjs` client is reserved for the setup-time handshake
+check performed by `scripts/ensure_youtube_mcp.sh`.
 
 ## Local state and credentials
 

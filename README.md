@@ -44,9 +44,10 @@ pinned to:
 - Commit: `06d5e7a83783f7a44498da88ade2ccaa42238747`
 - Node.js: `v24.14.0`
 
-The bootstrap script restores this exact version, builds it with an isolated
-npm cache, verifies the MCP handshake, and keeps disposable work separate from
-persistent local state.
+The one-time setup script installs this exact upstream revision, builds it with
+an isolated npm cache, verifies the MCP handshake, and registers it as the
+user-level `youtube` MCP in Codex. Codex then starts the stdio server on demand;
+normal skill runs neither reinstall it nor use a separate client wrapper.
 
 ## Gemini fallback
 
@@ -69,6 +70,19 @@ https://github.com/DRanger666/codex-youtube-skill
 The repository is the staged development source. The installed Codex skill
 should contain only runtime files: `SKILL.md`, `agents/`, `references/`, and
 `scripts/`.
+
+After installing the skill, perform the machine setup once:
+
+```sh
+sh /path/to/work-with-youtube/scripts/setup_youtube_mcp.sh
+codex mcp get youtube
+```
+
+This creates the pinned installation under
+`${YOUTUBE_SKILL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/codex-youtube}` and
+adds its stdio command to
+`${CODEX_HOME:-$HOME/.codex}/config.toml`. Start a new Codex session afterward
+so the newly registered tools are available.
 
 ## Development
 
