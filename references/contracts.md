@@ -75,11 +75,15 @@ three filename forms are:
 <videoId>--gemini-requests.json
 ```
 
-The local process environment supplies required `GEMINI_API_KEY` and optional
-`GEMINI_API_KEY_FALLBACK`. When both are set, they must be non-empty and
-different. Provision them through the user's shell or local secret manager
-before starting Codex. Never place either value in chat, command arguments,
-repository files, runtime state, saved responses, or logs.
+The private file
+`${CODEX_HOME:-$HOME/.codex}/secrets/work-with-youtube.env` supplies required
+`GEMINI_API_KEY` and optional `GEMINI_API_KEY_FALLBACK`. Its directory mode is
+`0700`; its file mode is `0600`. It is a regular file owned by the current user
+and contains only `NAME=VALUE` lines for those two fields. When both are set,
+they must be non-empty and different. Explicit process-environment values
+override the file without mixing the two sources. Never place either value in
+chat, command arguments, repository files, runtime state, saved responses, or
+logs.
 
 Routing is primary-first and sequential. A primary rate limit, credential
 failure, or exhausted transient retry budget permits the fallback project. A

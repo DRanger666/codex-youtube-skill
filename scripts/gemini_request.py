@@ -5,6 +5,7 @@ import json
 import os
 import random
 import re
+import stat
 import sys
 import time
 import urllib.error
@@ -27,6 +28,7 @@ KEY_INVALID_MARKERS = (
 POOL_STATE_FIELDS = {"fileFormatVersion", "buckets"}
 BUCKET_STATE_FIELDS = {"cooldownUntil", "disabled", "reason"}
 BUCKET_STATE_REASONS = {None, "rate_limited", "transient_failures", "credential_failure"}
+CREDENTIAL_NAMES = ("GEMINI_API_KEY", "GEMINI_API_KEY_FALLBACK")
 
 
 def utc_now():
@@ -125,11 +127,71 @@ def load_state(path):
     return validate_state(state)
 
 
+def credentials_path():
+    codex_home = os.environ.get("CODEX_HOME")
+    home = Path(codex_home).expanduser() if codex_home else Path.home() / ".codex"
+    return home.resolve() / "secrets" / "work-with-youtube.env"
+
+
+def load_credential_file(path):
+    path = Path(path)
+    try:
+        directory_stat = path.parent.stat()
+        file_stat = path.lstat()
+    except FileNotFoundError as error:
+        raise SystemExit(
+            f"Missing Gemini credentials file: {path}"
+        ) from error
+    if stat.S_IMODE(directory_stat.st_mode) != 0o700:
+        raise SystemExit(f"Gemini credentials directory must have mode 0700: {path.parent}")
+    if not stat.S_ISREG(file_stat.st_mode) or path.is_symlink():
+        raise SystemExit(f"Gemini credentials path must be a regular file: {path}")
+    if stat.S_IMODE(file_stat.st_mode) != 0o600:
+        raise SystemExit(f"Gemini credentials file must have mode 0600: {path}")
+    if hasattr(os, "geteuid") and file_stat.st_uid != os.geteuid():
+        raise SystemExit(f"Gemini credentials file must be owned by the current user: {path}")
+
+    values = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise SystemExit(f"Could not read Gemini credentials file: {path}") from error
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise SystemExit(
+                f"Malformed Gemini credentials file line {line_number}: expected NAME=VALUE"
+            )
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip()
+        if name not in CREDENTIAL_NAMES:
+            raise SystemExit(
+                f"Unsupported Gemini credentials field on line {line_number}: {name}"
+            )
+        if name in values:
+            raise SystemExit(
+                f"Duplicate Gemini credentials field on line {line_number}: {name}"
+            )
+        if not value:
+            raise SystemExit(f"Empty Gemini credential on line {line_number}: {name}")
+        values[name] = value
+    return values
+
+
 def load_buckets():
-    primary = os.environ.get("GEMINI_API_KEY")
-    fallback = os.environ.get("GEMINI_API_KEY_FALLBACK")
+    environment_supplied = any(name in os.environ for name in CREDENTIAL_NAMES)
+    if environment_supplied:
+        primary = os.environ.get("GEMINI_API_KEY")
+        fallback = os.environ.get("GEMINI_API_KEY_FALLBACK")
+    else:
+        credentials = load_credential_file(credentials_path())
+        primary = credentials.get("GEMINI_API_KEY")
+        fallback = credentials.get("GEMINI_API_KEY_FALLBACK")
     if not primary:
-        raise SystemExit("Missing required environment variable: GEMINI_API_KEY")
+        raise SystemExit("Missing required Gemini credential: GEMINI_API_KEY")
     if fallback and primary == fallback:
         raise SystemExit("Primary and fallback Gemini credentials must differ")
     buckets = [{"alias": "primary", "key": primary}]

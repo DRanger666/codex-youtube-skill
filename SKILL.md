@@ -20,8 +20,9 @@ Gemini.
 - Keep the portable installation under
   `${YOUTUBE_SKILL_HOME:-${CODEX_HOME:-$HOME/.codex}/mcp-servers}/youtube`,
   with disposable files under `work/` and persistent local data under `state/`.
-- Never display, quote, log, or commit API keys. Keep credential files out of
-  prompts, saved responses, request logs, material indexes, `work/`, and
+- Never display, quote, log, or commit API keys. Keep the credential file only
+  at `${CODEX_HOME:-$HOME/.codex}/secrets/work-with-youtube.env`, and keep it
+  out of prompts, saved responses, request logs, material indexes, `work/`, and
   `state/`.
 - Store saved Gemini work only in `$install/state/youtube-video-work/`. Keep
   disposable request and response files in `$install/work/`.
@@ -175,11 +176,14 @@ Never repeat the identical request as truncation handling.
 ## Load Gemini credentials privately
 
 The router reads required `GEMINI_API_KEY` and optional
-`GEMINI_API_KEY_FALLBACK` from the local process environment after request
-verification. The user should provision them through their shell or local
-secret manager before starting Codex. Never ask
-the user to paste a key into chat, print either value, put a value in a command
-argument, or save credentials under the repository or portable runtime.
+`GEMINI_API_KEY_FALLBACK` from
+`${CODEX_HOME:-$HOME/.codex}/secrets/work-with-youtube.env` after request
+verification. The `secrets/` directory must have mode `0700`; the file must
+have mode `0600`, be a regular file owned by the current user, and contain only
+`NAME=VALUE` lines for those two fields. Explicit process-environment values
+override the file for temporary use. Never ask the user to paste a key into
+chat, print either value, put a value in a command argument, or save credentials
+under the repository or portable runtime.
 
 When both keys are present, try the primary project first. Use the fallback
 sequentially only after the primary is rate-limited, rejected as an invalid

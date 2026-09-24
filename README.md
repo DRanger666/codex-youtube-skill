@@ -21,18 +21,19 @@ override its parent directory. The skill has no Google Drive dependency.
 
 ## Local credentials
 
-Provide Gemini credentials through the local process environment before
-starting Codex:
+Store Gemini credentials once in
+`${CODEX_HOME:-$HOME/.codex}/secrets/work-with-youtube.env`:
 
-```sh
-export GEMINI_API_KEY='...'
-# Optional second project:
-export GEMINI_API_KEY_FALLBACK='...'
+```text
+GEMINI_API_KEY=...
+GEMINI_API_KEY_FALLBACK=...
 ```
 
-Use a shell-integrated secret manager if preferred. Never paste keys into a
-Codex conversation or store them in this repository. If used, the fallback key
-belongs to a different Google Cloud project and must differ from the primary.
+The `secrets/` directory must have mode `0700` and the credential file mode
+`0600`. Never paste keys into a Codex conversation or store them in this
+repository. If used, the fallback key belongs to a different Google Cloud
+project and must differ from the primary. Explicit environment variables with
+the same names remain available as temporary overrides.
 
 ## Reproducible YouTube MCP
 

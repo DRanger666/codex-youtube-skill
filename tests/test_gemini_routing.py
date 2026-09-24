@@ -132,6 +132,18 @@ class GeminiRouterTests(unittest.TestCase):
         result = common.load_json(Path(self.args.router_result))
         return exit_code, result, transport
 
+    def write_credentials(self, primary="file-primary", fallback="file-fallback"):
+        codex_home = self.directory / "codex-home"
+        secrets = codex_home / "secrets"
+        secrets.mkdir(parents=True, mode=0o700)
+        credentials = secrets / "work-with-youtube.env"
+        lines = [f"GEMINI_API_KEY={primary}"]
+        if fallback is not None:
+            lines.append(f"GEMINI_API_KEY_FALLBACK={fallback}")
+        credentials.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        credentials.chmod(0o600)
+        return codex_home, credentials
+
     def test_primary_success_is_bound_to_request_run_and_exact_response_bytes(self):
         exit_code, result, transport = self.run_router([response(200)])
         self.assertEqual(exit_code, 0)
@@ -289,6 +301,74 @@ class GeminiRouterTests(unittest.TestCase):
                 fallback="environment-fallback",
             )
         self.assertEqual(transport.calls[0][1], "environment-primary")
+
+    def test_router_uses_persistent_two_key_credential_file(self):
+        codex_home, _ = self.write_credentials()
+        transport = FakeTransport(
+            [response(429, "RESOURCE_EXHAUSTED"), response(200)]
+        )
+        with mock.patch.dict(
+            os.environ,
+            {"CODEX_HOME": str(codex_home)},
+            clear=True,
+        ), mock.patch.object(
+            gemini_request, "send_request", transport
+        ), mock.patch.object(gemini_request.random, "uniform", return_value=0.0):
+            self.assertEqual(gemini_request.run(self.args), 0)
+        self.assertEqual(
+            [call[1] for call in transport.calls],
+            ["file-primary", "file-fallback"],
+        )
+        serialized = Path(self.args.router_result).read_text(encoding="utf-8")
+        self.assertNotIn("file-primary", serialized)
+        self.assertNotIn("file-fallback", serialized)
+
+    def test_environment_credentials_override_the_persistent_file(self):
+        codex_home, _ = self.write_credentials()
+        with mock.patch.dict(
+            os.environ,
+            {
+                "CODEX_HOME": str(codex_home),
+                "GEMINI_API_KEY": "environment-primary",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                gemini_request.load_buckets(),
+                [{"alias": "primary", "key": "environment-primary"}],
+            )
+
+    def test_credential_file_requires_private_permissions(self):
+        codex_home, credentials = self.write_credentials()
+        credentials.chmod(0o644)
+        with mock.patch.dict(
+            os.environ,
+            {"CODEX_HOME": str(codex_home)},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SystemExit, "mode 0600"):
+                gemini_request.load_buckets()
+        credentials.chmod(0o600)
+        credentials.parent.chmod(0o755)
+        with mock.patch.dict(
+            os.environ,
+            {"CODEX_HOME": str(codex_home)},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(SystemExit, "mode 0700"):
+                gemini_request.load_buckets()
+
+    def test_credential_file_parser_is_strict_without_disclosing_values(self):
+        codex_home, credentials = self.write_credentials()
+        credentials.write_text("UNSUPPORTED=do-not-disclose\n", encoding="utf-8")
+        with mock.patch.dict(
+            os.environ,
+            {"CODEX_HOME": str(codex_home)},
+            clear=True,
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                gemini_request.load_buckets()
+        self.assertNotIn("do-not-disclose", str(raised.exception))
 
     def test_fallback_environment_credential_is_optional(self):
         transport = FakeTransport([response(200)])
