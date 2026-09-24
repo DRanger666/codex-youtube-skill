@@ -1,8 +1,8 @@
 # Codex YouTube Skill
 
 This repository provides the `work-with-youtube` skill for local Codex use.
-It turns YouTube videos into research material for summarization, comparison,
-translation, transcription, visual inspection, and timestamped answers.
+It gives Codex structured access to YouTube transcripts, metadata, audio and
+visual evidence, translation, long-video processing, and timestamped answers.
 
 ## Source order
 

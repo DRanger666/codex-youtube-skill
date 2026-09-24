@@ -1,6 +1,6 @@
 ---
 name: work-with-youtube
-description: Reproducible YouTube research in Codex using MCP-first caption and metadata retrieval, locally saved Gemini video material, structured transcript generation, visual inspection, and long-video chunking. Use for requests to inspect, summarize, query, compare, cite, translate, transcribe, or verify one or more YouTube URLs or videos.
+description: Work with YouTube in Codex using MCP-first caption and metadata retrieval, locally saved Gemini video material, structured transcript generation, visual inspection, and long-video chunking. Use for requests to inspect, summarize, query, compare, cite, translate, transcribe, or verify one or more YouTube URLs or videos.
 ---
 
 # Work with YouTube
